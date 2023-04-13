@@ -3,7 +3,9 @@ import { Server as SocketServer, Socket } from "socket.io";
 import IRoom from "./interface/IRoom";
 import createCheckers from "./utils/createCheckers";
 import userRole from "./enum/userRole";
+import checkGameOver from "./utils/checkGameOver";
 const MAX_PLAYERS: number = 2;
+const MIN_PLAYERS: number = 2;
 
 const httpServer: http.Server = http.createServer();
 
@@ -32,6 +34,7 @@ io.on("connection", (socket: Socket) => {
         players: [socket.id],
         checkers: createCheckers(),
         checkersCount: 0,
+        gameOver: false,
       };
 
       userRoles[socket.id] = userRole.PLAYER1;
@@ -50,6 +53,11 @@ io.on("connection", (socket: Socket) => {
       }
     }
     socket.join(room);
+    socket.emit("join-room-ack", {
+      message: `You have joined a room`,
+      room,
+      role: userRoles[socket.id],
+    });
     console.log(`on connection, active games: ${gameRooms.length}`);
   });
 
@@ -68,6 +76,7 @@ io.on("connection", (socket: Socket) => {
     );
 
     if (!gameRoom) return;
+    if (gameRoom.players.length < MIN_PLAYERS) return;
 
     // Find row and column indices of the cell clicked on
     const [row, column] = [
@@ -78,8 +87,13 @@ io.on("connection", (socket: Socket) => {
     // Find the checker to show
     const checker = gameRoom.checkers[row][column];
 
-    // // Make sure the cell is not disabled
-    if (checker.disabled) return;
+    // Make sure the cell is not disabled
+    if (checker.disabled) {
+      return socket.emit("updated-checkers", {
+        checkers: gameRoom.checkers,
+        count: gameRoom.checkersCount,
+      });
+    }
 
     // Make Updates
     if (gameRoom.checkersCount % 2 === 0) {
