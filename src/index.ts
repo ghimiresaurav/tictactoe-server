@@ -31,6 +31,7 @@ io.on("connection", (socket: Socket) => {
         roomId: room,
         players: [socket.id],
         checkers: createCheckers(),
+        checkersCount: 0,
       };
 
       userRoles[socket.id] = userRole.PLAYER1;
@@ -49,6 +50,57 @@ io.on("connection", (socket: Socket) => {
       }
     }
     socket.join(room);
+    console.log(`on connection, active games: ${gameRooms.length}`);
+  });
+
+  socket.on("place-checker", (cellId: string) => {
+    // Make sure if the user trying to place the checker is NOT a spectator
+    if (userRoles[socket.id] && userRoles[socket.id] === userRole.SPECTATOR)
+      return;
+
+    console.log(
+      `player ${socket.id} wants to place a checker on cell ${cellId}`
+    );
+
+    // Find the gameRoom of the player
+    const gameRoom: IRoom | undefined = gameRooms.find((elem) =>
+      elem.players.includes(socket.id)
+    );
+
+    if (!gameRoom) return;
+
+    // Find row and column indices of the cell clicked on
+    const [row, column] = [
+      parseInt(cellId.split("")[0]),
+      parseInt(cellId.split("")[1]),
+    ];
+
+    // Find the checker to show
+    const checker = gameRoom.checkers[row][column];
+
+    // // Make sure the cell is not disabled
+    if (checker.disabled) return;
+
+    // Make Updates
+    if (gameRoom.checkersCount % 2 === 0) {
+      if (userRoles[socket.id] === userRole.PLAYER1) {
+        checker.showX = true;
+        checker.disabled = true;
+        gameRoom.checkersCount++;
+      } else return;
+    } else {
+      if (userRoles[socket.id] === userRole.PLAYER2) {
+        checker.showO = true;
+        checker.disabled = true;
+        gameRoom.checkersCount++;
+      } else return;
+    }
+
+    // Send back updated checkers to client
+    io.sockets.in(gameRoom.roomId).emit("updated-checkers", {
+      checkers: gameRoom.checkers,
+      count: gameRoom.checkersCount,
+    });
   });
 
   socket.on("disconnect", () => {
@@ -66,6 +118,7 @@ io.on("connection", (socket: Socket) => {
     );
     // Remove the room from gameRooms
     gameRooms = gameRooms.splice(gameRoomIndex, 1);
+    console.log(`on dis-connection, active games: ${gameRooms.length}`);
   });
 });
 
