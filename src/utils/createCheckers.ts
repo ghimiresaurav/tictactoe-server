@@ -6,8 +6,7 @@ const createCheckers = () => {
     const row: Array<IChecker> = [];
     for (let j = 0; j < 3; j++) {
       const checker: IChecker = {
-        showX: false,
-        showO: false,
+        type: "",
         disabled: false,
         id: `${i}${j}`,
       };

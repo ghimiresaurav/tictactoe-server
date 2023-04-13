@@ -1,6 +1,5 @@
 interface IChecker {
-  showX: boolean;
-  showO: boolean;
+  type: string;
   disabled: boolean;
   id: string;
 }
