@@ -148,6 +148,28 @@ io.on("connection", (socket: Socket) => {
     });
   });
 
+  // Play Again
+  socket.on("play-again", (room: string) => {
+    // Find the room which requested a new game
+    const gameRoom: IRoom | undefined = gameRooms.find(
+      (elem) => elem.roomId === room
+    );
+
+    if (!gameRoom) return;
+
+    // Reset game data in the gameroom
+    gameRoom.checkersCount = 0;
+    gameRoom.gameStatus = gameStatus.PLAYING;
+    gameRoom.checkers = createCheckers();
+
+    io.sockets.to(gameRoom.roomId).emit("new-game", {
+      message: `New game has been commenced.`,
+      checkers: gameRoom.checkers,
+      count: gameRoom.checkersCount,
+      gameStatus: gameRoom.gameStatus,
+    });
+  });
+
   socket.on("disconnect", () => {
     // If a user disconnects from a gameRoom
     // Find whether the disconnecting user was a player
