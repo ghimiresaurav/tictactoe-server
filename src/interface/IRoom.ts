@@ -5,7 +5,7 @@ interface IRoom {
   players: Array<string>;
   checkers: Array<Array<IChecker>>;
   checkersCount: number;
-  gameOver: boolean;
+  gameStatus: string;
 }
 
 export default IRoom;

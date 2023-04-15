@@ -4,6 +4,8 @@ import IRoom from "./interface/IRoom";
 import createCheckers from "./utils/createCheckers";
 import userRole from "./enum/userRole";
 import checkGameOver from "./utils/checkGameOver";
+import checkerType from "./enum/checkerType";
+import gameStatus from "./enum/gameStatus";
 const MAX_PLAYERS: number = 2;
 const MIN_PLAYERS: number = 2;
 
@@ -34,7 +36,7 @@ io.on("connection", (socket: Socket) => {
         players: [socket.id],
         checkers: createCheckers(),
         checkersCount: 0,
-        gameOver: false,
+        gameStatus: gameStatus.WAITING,
       };
 
       userRoles[socket.id] = userRole.PLAYER1;
@@ -48,8 +50,17 @@ io.on("connection", (socket: Socket) => {
         // Make sure same player id is not repeated
         !gameRoom.players.includes(socket.id)
       ) {
+        const player1 = gameRoom.players[0];
+        io.to(player1).emit("join-room-ack", {
+          message: "Another player has joined the room.",
+          gameStatus: gameStatus.PLAYING,
+          role: userRoles[player1],
+        });
+
+        // Add player2's id to the players list
         gameRoom.players.push(socket.id);
         userRoles[socket.id] = userRole.PLAYER2;
+        gameRoom.gameStatus = gameStatus.PLAYING;
       }
     }
     socket.join(room);
@@ -57,6 +68,7 @@ io.on("connection", (socket: Socket) => {
       message: `You have joined a room`,
       room,
       role: userRoles[socket.id],
+      gameStatus: gameRoom?.gameStatus,
     });
     console.log(`on connection, active games: ${gameRooms.length}`);
   });
@@ -98,18 +110,19 @@ io.on("connection", (socket: Socket) => {
     // Make Updates
     if (gameRoom.checkersCount % 2 === 0) {
       if (userRoles[socket.id] === userRole.PLAYER1) {
-        checker.showX = true;
+        // checker.showX = true;
+        checker.type = checkerType.X;
         checker.disabled = true;
         gameRoom.checkersCount++;
       } else return;
     } else {
       if (userRoles[socket.id] === userRole.PLAYER2) {
-        checker.showO = true;
+        // checker.showO = true;
+        checker.type = checkerType.O;
         checker.disabled = true;
         gameRoom.checkersCount++;
       } else return;
     }
-
     // Send back updated checkers to client
     io.sockets.in(gameRoom.roomId).emit("updated-checkers", {
       checkers: gameRoom.checkers,
