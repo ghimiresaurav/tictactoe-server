@@ -15,13 +15,22 @@ const io = new SocketServer(httpServer, {
   cors: { origin: "*" },
 });
 
+interface IUser {
+  id: string;
+  room: string;
+  role: string;
+}
+
 let gameRooms: Array<IRoom> = [];
-const userRoles: any = {};
+const users: any = {};
+// const users: Array<IUser> = [];
 
 io.on("connection", (socket: Socket) => {
   socket.on("join-room", (room: string) => {
     // Assign users SPECTATOR role
-    if (!userRoles[socket.id]) userRoles[socket.id] = userRole.SPECTATOR;
+    if (!users[socket.id]) {
+      users[socket.id] = { role: userRole.SPECTATOR, room, id: socket.id };
+    }
 
     // Check whether the room already exists or not
     const gameRoom: IRoom | undefined = gameRooms.find(
@@ -39,7 +48,7 @@ io.on("connection", (socket: Socket) => {
         gameStatus: gameStatus.WAITING,
       };
 
-      userRoles[socket.id] = userRole.PLAYER1;
+      users[socket.id] = { role: userRole.PLAYER1, room, id: socket.id };
       // Add the recently created game room to gameRooms
       gameRooms.push(newGameRoom);
     } else {
@@ -54,12 +63,12 @@ io.on("connection", (socket: Socket) => {
         io.to(player1).emit("join-room-ack", {
           message: "Another player has joined the room.",
           gameStatus: gameStatus.PLAYING,
-          role: userRoles[player1],
+          role: users[player1].role,
         });
 
         // Add player2's id to the players list
         gameRoom.players.push(socket.id);
-        userRoles[socket.id] = userRole.PLAYER2;
+        users[socket.id] = { role: userRole.PLAYER2, room, id: socket.id };
         gameRoom.gameStatus = gameStatus.PLAYING;
       }
     }
@@ -67,14 +76,14 @@ io.on("connection", (socket: Socket) => {
     socket.emit("join-room-ack", {
       message: `You have joined a room`,
       room,
-      role: userRoles[socket.id],
+      role: users[socket.id].role,
       gameStatus: gameRoom?.gameStatus,
     });
   });
 
   socket.on("place-checker", (cellId: string) => {
     // Make sure if the user trying to place the checker is NOT a spectator
-    if (userRoles[socket.id] && userRoles[socket.id] === userRole.SPECTATOR)
+    if (users[socket.id] && users[socket.id].role === userRole.SPECTATOR)
       return;
 
     // Find the gameRoom of the player
@@ -104,14 +113,14 @@ io.on("connection", (socket: Socket) => {
 
     // Make Updates
     if (gameRoom.checkersCount % 2 === 0) {
-      if (userRoles[socket.id] === userRole.PLAYER1) {
+      if (users[socket.id].role === userRole.PLAYER1) {
         // checker.showX = true;
         checker.type = checkerType.X;
         checker.disabled = true;
         gameRoom.checkersCount++;
       } else return;
     } else {
-      if (userRoles[socket.id] === userRole.PLAYER2) {
+      if (users[socket.id].role === userRole.PLAYER2) {
         // checker.showO = true;
         checker.type = checkerType.O;
         checker.disabled = true;
@@ -179,12 +188,17 @@ io.on("connection", (socket: Socket) => {
 
     if (gameRoomIndex === -1) return;
 
-    // Remove data of room
-    gameRooms[gameRoomIndex]?.players.forEach(
-      (player) => delete userRoles[player]
+    // Get a list of all users' ids from the room
+    const roomId: string = gameRooms[gameRoomIndex].roomId;
+    const usersToRemove = Object.values(users).filter(
+      (elem: any) => elem.room === roomId
     );
+    // Remove users info from the array users
+    usersToRemove.forEach((user: any) => {
+      delete users[user.id];
+    });
     // Remove the room from gameRooms
-    gameRooms = gameRooms.splice(gameRoomIndex, 1);
+    gameRooms.splice(gameRoomIndex, 1);
   });
 });
 
