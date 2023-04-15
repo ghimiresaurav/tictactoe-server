@@ -70,17 +70,12 @@ io.on("connection", (socket: Socket) => {
       role: userRoles[socket.id],
       gameStatus: gameRoom?.gameStatus,
     });
-    console.log(`on connection, active games: ${gameRooms.length}`);
   });
 
   socket.on("place-checker", (cellId: string) => {
     // Make sure if the user trying to place the checker is NOT a spectator
     if (userRoles[socket.id] && userRoles[socket.id] === userRole.SPECTATOR)
       return;
-
-    console.log(
-      `player ${socket.id} wants to place a checker on cell ${cellId}`
-    );
 
     // Find the gameRoom of the player
     const gameRoom: IRoom | undefined = gameRooms.find((elem) =>
@@ -123,6 +118,29 @@ io.on("connection", (socket: Socket) => {
         gameRoom.checkersCount++;
       } else return;
     }
+
+    // Check for game over condition
+    if (gameRoom.checkersCount > 4) {
+      const win: boolean = checkGameOver(gameRoom.checkers, checker);
+
+      // Gameover
+      if (win || gameRoom.checkersCount === 9) {
+        let gameOverStats = {
+          gameStatus: gameStatus.GAME_OVER,
+          win,
+          winner: "",
+        };
+
+        if (win) {
+          gameRoom.gameStatus = gameStatus.GAME_OVER;
+          gameOverStats.winner =
+            checker.type === checkerType.X ? "player1" : "player2";
+        }
+
+        io.sockets.in(gameRoom.roomId).emit("game-over", gameOverStats);
+      }
+    }
+
     // Send back updated checkers to client
     io.sockets.in(gameRoom.roomId).emit("updated-checkers", {
       checkers: gameRoom.checkers,
@@ -145,7 +163,6 @@ io.on("connection", (socket: Socket) => {
     );
     // Remove the room from gameRooms
     gameRooms = gameRooms.splice(gameRoomIndex, 1);
-    console.log(`on dis-connection, active games: ${gameRooms.length}`);
   });
 });
 
