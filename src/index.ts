@@ -15,15 +15,8 @@ const io = new SocketServer(httpServer, {
   cors: { origin: "*" },
 });
 
-interface IUser {
-  id: string;
-  room: string;
-  role: string;
-}
-
 let gameRooms: Array<IRoom> = [];
 const users: any = {};
-// const users: Array<IUser> = [];
 
 io.on("connection", (socket: Socket) => {
   socket.on("join-room", (room: string) => {
@@ -164,12 +157,34 @@ io.on("connection", (socket: Socket) => {
       (elem) => elem.roomId === room
     );
 
-    if (!gameRoom) return;
+    // Make sure the requesting user is not spectator
+    if (!gameRoom || users[socket.id].role === userRole.SPECTATOR) return;
 
     // Reset game data in the gameroom
     gameRoom.checkersCount = 0;
     gameRoom.gameStatus = gameStatus.PLAYING;
     gameRoom.checkers = createCheckers();
+
+    // Find the players of the room
+    const players = Object.values(users)
+      .filter(
+        (elem: any) => elem.room === room && elem.role !== userRole.SPECTATOR
+      )
+      .map((elem: any) => {
+        return {
+          ...elem,
+          role:
+            // Exchange roles of players
+            elem.role === userRole.PLAYER1
+              ? userRole.PLAYER2
+              : userRole.PLAYER1,
+        };
+      });
+
+    // Update players list
+    players.forEach((player) => {
+      users[player.id] = player;
+    });
 
     io.sockets.to(gameRoom.roomId).emit("new-game", {
       message: `New game has been commenced.`,
